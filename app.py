@@ -122,8 +122,9 @@ def buscar_skateparks(tipo_busqueda, codigo_postal, pais, ciudad, lat, lon, radi
             'DIRECCIÓN': direccion,
             'LATITUD': lat_gps,
             'LONGITUD': lon_gps,
-            'GOOGLE_MAPS_GEO_PIN': get_google_maps_geoloc(lat_gps, lon_gps),
             'GOOGLE_MAPS_URL': get_google_maps_url(place_id)
+            #'GOOGLE_MAPS_GEO_PIN': get_google_maps_geoloc(lat_gps, lon_gps),
+
         })
 
     return skateparks

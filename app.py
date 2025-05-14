@@ -24,9 +24,13 @@ CENTRO_PENINSULA= (40.3952443,	-3.703458799999999)
 
 map = folium.Map(location=CENTRO_PENINSULA, zoom_start=9)
 
+#tipo_busquete_filter = {
+#    "Skatepark": "skatepark",
+#    "Skateshop": "skateshop"
+#}
+
 tipo_busquete_filter = {
-    "Skatepark": "skatepark",
-    "Skateshop": "skateshop"
+    "Skatepark": "skatepark"
 }
 
 tipo_formato_filter = {

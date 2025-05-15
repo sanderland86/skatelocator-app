@@ -52,7 +52,7 @@ google_places_api_key = 'AIzaSyDPxIDtEWLTqlDL3hvJSNXhIrLqo7vwIU8'
 def convert_for_download(df):
     return df.to_csv().encode("utf-8")
 
-def obtener_coordenadas(codigo_postal, pais=''):
+def obtener_coordenadas2(codigo_postal, pais=''):
     geolocator = Nominatim(user_agent="skatepark_finder_v1")
     consulta = f"{codigo_postal}, {pais}" if pais else codigo_postal
     location = geolocator.geocode(consulta, timeout=10)
@@ -61,6 +61,19 @@ def obtener_coordenadas(codigo_postal, pais=''):
     else:
         raise ValueError(f"No se pudo encontrar coordenadas para: {consulta}")
 
+def obtener_coordenadas(codigo_postal, pais=''):
+    try:
+        url = f"https://nominatim.openstreetmap.org/search?q={codigo_postal},{pais}&format=json&limit=1"
+        headers = {"User-Agent": "skatepark_finder_v1 (sandro.lescano@gmail.com)"}
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()  # Esto lanza un error si la respuesta no es 200
+        data = response.json()
+        if data:
+            return float(data[0]['lat']), float(data[0]['lon'])
+        else:
+            raise ValueError(f"No se encontraron coordenadas para: {codigo_postal}, {pais}")
+    except requests.RequestException as e:
+        raise ValueError(f"Error de red para '{codigo_postal}, {pais}': {str(e)}")    
 
 def wrap_text(text, width=80):
     return "\n".join(textwrap.wrap(text, width))

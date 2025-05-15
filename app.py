@@ -75,6 +75,26 @@ def obtener_coordenadas(codigo_postal, pais=''):
     except requests.RequestException as e:
         raise ValueError(f"Error de red para '{codigo_postal}, {pais}': {str(e)}")    
 
+def obtener_coordenadas_google(codigo_postal, pais=''):
+    try:
+        address = f"{codigo_postal}, {pais}"
+        url = f"https://maps.googleapis.com/maps/api/geocode/json"
+        params = {
+            "address": address,
+            "key": google_places_api_key
+        }
+        headers = {"User-Agent": "skatepark_finder_v1 (contacto@tucorreo.com)"}
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        if data.get('results'):
+            location = data['results'][0]['geometry']['location']
+            return location['lat'], location['lng']
+        else:
+            raise ValueError(f"No se encontraron coordenadas para: {address}")
+    except requests.RequestException as e:
+        raise ValueError(f"Error de red para '{address}': {str(e)}")
+
 def wrap_text(text, width=80):
     return "\n".join(textwrap.wrap(text, width))
 
@@ -171,7 +191,8 @@ def ejecutar_busqueda(codigo_postal,pais,ciudad,radio,imagenes,nombre_fichero,pa
         print ('formato           [{}  ]: '.format(formato))
 
 
-        lat, lon = obtener_coordenadas(codigo_postal, pais)
+        #lat, lon = obtener_coordenadas(codigo_postal, pais)
+        lat, lon = obtener_coordenadas_google(codigo_postal, pais)
         print(f"Buscando skateparks alrededor de {codigo_postal} ({lat}, {lon})...")
 
         skateparks = buscar_skateparks(nombre_fichero, codigo_postal, pais, ciudad, lat, lon, radio, int(imagenes))

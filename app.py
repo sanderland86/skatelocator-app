@@ -53,9 +53,9 @@ def convert_for_download(df):
     return df.to_csv().encode("utf-8")
 
 def obtener_coordenadas(codigo_postal, pais=''):
-    geolocator = Nominatim(user_agent="skatepark_locator")
+    geolocator = Nominatim(user_agent="skatepark_finder_v1")
     consulta = f"{codigo_postal}, {pais}" if pais else codigo_postal
-    location = geolocator.geocode(consulta)
+    location = geolocator.geocode(consulta, timeout=10)
     if location:
         return location.latitude, location.longitude
     else:

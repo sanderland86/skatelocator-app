@@ -24,14 +24,14 @@ CENTRO_PENINSULA= [40.3952443,	-3.703458799999999]
 
 
 
-tipo_busqueda_filter = {
-    "Skatepark": "skatepark",
-    "Skateshop": "skateshop"
-}
-
-#tipo_busquete_filter = {
-#    "Skatepark": "skatepark"
+#tipo_busqueda_filter = {
+#    "Skatepark": "skatepark",
+#    "Skateshop": "skateshop"
 #}
+
+tipo_busqueda_filter = {
+    "Skatepark": "skatepark"
+}
 
 tipo_formato_filter = {
     "CSV": "csv",

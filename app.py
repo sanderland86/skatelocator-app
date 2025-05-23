@@ -13,7 +13,7 @@ import xlsxwriter
 import folium
 from streamlit_folium import st_folium
 
-
+ 
 NUMBER_INPUT    =  "number_input"
 SELECTBOX       =  "selectbox"
 DATE_INPUT      =  "date_input"

@@ -20,18 +20,18 @@ DATE_INPUT      =  "date_input"
 CHECKBOX        =  "checkbox"
 TEXTBOX         =  "text_input"
 
-CENTRO_PENINSULA= (40.3952443,	-3.703458799999999)
+CENTRO_PENINSULA= [40.3952443,	-3.703458799999999]
 
-map = folium.Map(location=CENTRO_PENINSULA, zoom_start=9)
+
+
+tipo_busqueda_filter = {
+    "Skatepark": "skatepark",
+    "Skateshop": "skateshop"
+}
 
 #tipo_busquete_filter = {
-#    "Skatepark": "skatepark",
-#    "Skateshop": "skateshop"
+#    "Skatepark": "skatepark"
 #}
-
-tipo_busquete_filter = {
-    "Skatepark": "skatepark"
-}
 
 tipo_formato_filter = {
     "CSV": "csv",
@@ -46,22 +46,74 @@ st.set_page_config(page_title="Skatepar/Skateshop finder", layout="wide")
 st.title("Wandanataleon Skatepark finder - MVP V1")
 
 # Configuración
-google_places_api_key = 'AIzaSyDPxIDtEWLTqlDL3hvJSNXhIrLqo7vwIU8'
+google_places_api_key = st.secrets["GP_AK"]
 
-@st.cache_data
+#@st.cache_data
 def convert_for_download(df):
     return df.to_csv().encode("utf-8")
 
-def obtener_coordenadas2(codigo_postal, pais=''):
-    geolocator = Nominatim(user_agent="skatepark_finder_v1")
-    consulta = f"{codigo_postal}, {pais}" if pais else codigo_postal
-    location = geolocator.geocode(consulta, timeout=10)
-    if location:
-        return location.latitude, location.longitude
-    else:
-        raise ValueError(f"No se pudo encontrar coordenadas para: {consulta}")
 
-def obtener_coordenadas(codigo_postal, pais=''):
+def renderiza_mapa(df, centro=CENTRO_PENINSULA, zoom=9):
+
+
+    print ("Renderizando el fucking mapa...")
+    
+    # Inicializar el estado si no existe
+    if "markers" not in st.session_state:
+        st.session_state["markers"] = []
+    if "center" not in st.session_state:
+        st.session_state["center"] = centro
+    if "zoom" not in st.session_state:
+        st.session_state["zoom"] = zoom
+
+    st.session_state["skateparks"] = df
+    print (f"dataframe: [{st.session_state['skateparks']}]")
+
+    if "skateparks" in st.session_state:
+        m = folium.Map(location=st.session_state["center"], zoom_start=st.session_state["zoom"])
+        fg = folium.FeatureGroup(name="Markers")
+    
+    # Crear el mapa centrado
+    m = folium.Map(location=st.session_state["center"], zoom_start=st.session_state["zoom"])
+
+    # Crear un grupo de características para los marcadores
+    fg = folium.FeatureGroup(name="Markers")
+
+    # Añadir los marcadores de prueba
+    for park in st.session_state["skateparks"].itertuples():
+        print  (f"lat[{park.LATITUD}] lon [{park.LONGITUD}]")
+
+        marker = folium.Marker(
+            location=[float(park.LATITUD), float(park.LONGITUD)],
+            popup=park.NOMBRE,
+            tooltip=park.NOMBRE,
+            icon=folium.Icon(color="blue", icon="skateboard", prefix="fa")
+        )
+        fg.add_child(marker)
+        st.session_state["markers"].append(marker)
+
+    # Añadir los marcadores almacenados en session_state
+    for marker in st.session_state["markers"]:
+        fg.add_child(marker)
+
+
+    # Renderizar el mapa
+    output = st_folium(
+        m,
+        center=st.session_state["center"],
+        zoom=st.session_state["zoom"],
+        key="new",
+        feature_group_to_add=fg,
+        height=500,
+        width=900,
+    )
+    
+    st.write("Número de marcadores:", len(st.session_state["markers"]))
+
+
+
+
+def obtener_coordenadas_nominatim(codigo_postal, pais=''):
     try:
         url = f"https://nominatim.openstreetmap.org/search?q={codigo_postal},{pais}&format=json&limit=1"
         headers = {"User-Agent": "skatepark_finder_v1 (sandro.lescano@gmail.com)"}
@@ -75,9 +127,9 @@ def obtener_coordenadas(codigo_postal, pais=''):
     except requests.RequestException as e:
         raise ValueError(f"Error de red para '{codigo_postal}, {pais}': {str(e)}")    
 
-def obtener_coordenadas_google(codigo_postal, pais=''):
+def obtener_coordenadas_google(ciudad, codigo_postal, pais=''):
     try:
-        address = f"{codigo_postal}, {pais}"
+        address = f"{codigo_postal if codigo_postal!=0 else ciudad}, {pais}"
         url = f"https://maps.googleapis.com/maps/api/geocode/json"
         params = {
             "address": address,
@@ -89,14 +141,12 @@ def obtener_coordenadas_google(codigo_postal, pais=''):
         data = response.json()
         if data.get('results'):
             location = data['results'][0]['geometry']['location']
-            return location['lat'], location['lng']
+            return float(location['lat']), float(location['lng'])
         else:
             raise ValueError(f"No se encontraron coordenadas para: {address}")
     except requests.RequestException as e:
         raise ValueError(f"Error de red para '{address}': {str(e)}")
 
-def wrap_text(text, width=80):
-    return "\n".join(textwrap.wrap(text, width))
 
 def get_google_maps_geoloc(lat, lon):
     return f'https://www.google.com/maps?q={lat},{lon}'
@@ -151,16 +201,17 @@ def buscar_skateparks(tipo_busqueda, codigo_postal, pais, ciudad, lat, lon, radi
 
 
         skateparks.append({
-            'NOMBRE': nombre,
+            'NOMBRE': str(nombre).replace('"', ''),
             'DIRECCIÓN': direccion,
             'LATITUD': lat_gps,
             'LONGITUD': lon_gps,
-            'GOOGLE_MAPS_URL': get_google_maps_url(place_id)
-            #'GOOGLE_MAPS_GEO_PIN': get_google_maps_geoloc(lat_gps, lon_gps),
-
+            'GOOGLE_MAPS_URL': get_google_maps_url(place_id),
+            'GOOGLE_MAPS_GEO_PIN': get_google_maps_geoloc(lat_gps, lon_gps)
         })
 
     return skateparks
+
+
 
 def guardar_resultados(skateparks, archivo='skateparks', formato='csv'):
     df = pd.DataFrame(skateparks)
@@ -175,113 +226,94 @@ def guardar_resultados(skateparks, archivo='skateparks', formato='csv'):
         df.to_csv(archivo, index=False)
         print(f"Resultados guardados en CSV: {archivo}")
 
-# Interfaz Gráfica
-def ejecutar_busqueda(codigo_postal,pais,ciudad,radio,imagenes,nombre_fichero,path,formato):
+def dame_skateparks(codigo_postal,pais,ciudad,radio,imagenes,tipo_busqueda):
+    df_skateparks = None
+    lat = None
+    lon = None
+    
     try:   
         
-        print ('Empezando la busqueda: ')
+        print (f"Empezando la busqueda de {tipo_busqueda}s: ")
         print ("----------------------------")
         print ('codigo_postal     [{}  ]: '.format(codigo_postal))
         print ('pais              [{}  ]: '.format(pais))
         print ('ciudad            [{}  ]: '.format(ciudad))
         print ('numero_imagenes   [{}  ]: '.format(imagenes))
         print ('radio_busqueda    [{}KM]: '.format(radio))
-        print ('path_fichero      [{}  ]: '.format(path))
-        print ('nombre_fichero    [{}  ]: '.format(nombre_fichero))
-        print ('formato           [{}  ]: '.format(formato))
+        print ('nombre_fichero    [{}  ]: '.format(tipo_busqueda))
 
 
         #lat, lon = obtener_coordenadas(codigo_postal, pais)
-        lat, lon = obtener_coordenadas_google(codigo_postal, pais)
-        print(f"Buscando skateparks alrededor de {codigo_postal} ({lat}, {lon})...")
-
-        skateparks = buscar_skateparks(nombre_fichero, codigo_postal, pais, ciudad, lat, lon, radio, int(imagenes))
-
+        lat, lon =obtener_coordenadas_google(ciudad, codigo_postal, pais)
+        print(f"lat[{lat}] - lon [{lon}] |lat type[{type(lat)}] lon type[{type(lon)}]")
+        print(f"Buscando skateparks alrededor de {codigo_postal if codigo_postal !=0 else ciudad} ({lat}, {lon})...")
+        
+        skateparks = buscar_skateparks(tipo_busqueda, codigo_postal, pais, ciudad, lat, lon, radio, int(imagenes))
+        #print (f"Skateparks: [{skateparks}]")
+        #print (f"skateparks[{skateparks}]")
         if skateparks:
             # Convertir a DataFrame para st.map()
             df_skateparks = pd.DataFrame(skateparks)
-
-            # Renombrar columnas para st.map()
-            df_skateparks_map = df_skateparks.rename(columns={'LATITUD': 'lat', 'LONGITUD': 'lon'})
-
-            # Mostrar el mapa
-            st.map(df_skateparks_map)
-
-            #st_folium(df_skateparks_map, width=700)
-            
-            # Configurar la columna como enlaces
-            st.data_editor(
-                df_skateparks,
-                column_config={
-                    "GOOGLE_MAPS_URL": st.column_config.LinkColumn(
-                        "GOOGLE_MAPS_URL",
-                        help="Haz clic para visitar el sitio del skatepark",
-                        width="large"  # Ajusta el ancho de la columna
-                    ),
-                    "GOOGLE_MAPS_GEO_PIN": st.column_config.LinkColumn(
-                        "GOOGLE_MAPS_GEO_PIN",
-                        help="Haz clic para visitar el sitio del skatepark",
-                        width="large"  # Ajusta el ancho de la columna
-                    )
-                },
-                hide_index=True
-            )
-
-            # Mostrar la tabla para verificar los datos
-            #st.dataframe(df_skateparks)
-
-            # Guardar en session_state
             st.session_state["df_skateparks"] = df_skateparks
-            st.session_state["df_skateparks_map"] = df_skateparks_map
-
-
-
-
-            ext = 'xlsx' if formato == 'excel' else 'csv'
-            archivo = f"{nombre_fichero}_{codigo_postal if int(codigo_postal) !=0 else ciudad}_{pais}{f'_{radio}KM' if int(radio) !=0 and int(radio) != '' else ''}.{ext}"
-
-            if formato == 'excel':
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                    df_skateparks.to_excel(writer, index=False, sheet_name="Skateparks")
-                    writer.close()
-                output.seek(0)
-                st.download_button(
-                    label="📥 Descargar Excel",
-                    data=output,
-                    file_name=archivo,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-            else:
-                csv = df_skateparks.to_csv(index=False).encode("utf-8")
-                st.download_button(
-                    label="📥 Descargar CSV",
-                    data=csv,
-                    file_name=archivo,
-                    mime="text/csv"
-                )
-
-          
-            #nombre_completo = f"{nombre_fichero}_{codigo_postal or ciudad}_{pais}_{radio}KM.{ext}"
-            #full_path = os.path.join(path, nombre_completo)
-            #guardar_resultados(skateparks, full_path, formato)
-            #messagebox.showinfo("Éxito", f"Se han guardado los resultados en:\n{full_path}")
-            #msg = f"Se han guardado los resultados en:\n{wrap_text(archivo, 100)}"
-            #st.success(f"¡Exito! {msg}")
-        else:
-            st.warning("Sin resultados: No se encontraron skateparks")
+            st.session_state["lat"] = lat
+            st.session_state["lon"] = lon
+            
     except Exception as e:
         st.error(f"Error {str(e)}") 
+    
+    return df_skateparks, lat, lon 
 
 
+def renderiza_dataframe():
+                # Configurar la columna como enlaces
+    st.data_editor(
+        st.session_state["skateparks"],
+        column_config={
+            "GOOGLE_MAPS_URL": st.column_config.LinkColumn(
+                "GOOGLE_MAPS_URL",
+                help="Haz clic para visitar el sitio del skatepark",
+                width="large"  # Ajusta el ancho de la columna
+            ),
+            "GOOGLE_MAPS_GEO_PIN": st.column_config.LinkColumn(
+                "GOOGLE_MAPS_GEO_PIN",
+                help="Haz clic para visitar el sitio del skatepark",
+                width="large"  # Ajusta el ancho de la columna
+            )
+        },
+        hide_index=True
+    )
 
+def descarga_fichero(df, formato, nombre_fichero, codigo_postal, ciudad, pais, radio):
+    
+    ext = 'xlsx' if formato == 'excel' else 'csv'
+    archivo = f"{nombre_fichero}_{codigo_postal if int(codigo_postal) !=0 else ciudad}_{pais}{f'_{radio}KM' if int(radio) !=0 and int(radio) != '' else ''}.{ext}"
 
+    if formato == 'excel':
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, sheet_name="Skateparks")
+            writer.close()
+        output.seek(0)
+        st.download_button(
+            label="📥 Descargar Excel",
+            data=output,
+            file_name=archivo,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    else:
+        csv = df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="📥 Descargar CSV",
+            data=csv,
+            file_name=archivo,
+            mime="text/csv"
+        )
 
 
 def custom_input(label, session_key, input_type, options=None, default=None, **kwargs):
     """Crea un input de Streamlit con manejo de session_state y valores internos."""
     
-    # Inicializar el estado de sesión si no está definido
+    # Solo inicializa el estado si no está definido
     if session_key not in st.session_state:
         if input_type == "selectbox" and options:
             st.session_state[session_key] = default or list(options.keys())[0]
@@ -297,62 +329,138 @@ def custom_input(label, session_key, input_type, options=None, default=None, **k
             raise ValueError(f"Unsupported input type: {input_type}")
   
     # Crear el input correspondiente
+    current_value = st.session_state[session_key]
     if input_type == "selectbox" and options:
-        
-        #print (f"OPTION KEYS: [{list(options.keys())}]")
-        selected_label = st.selectbox(label, list(options.keys()),index=list(options.keys()).index(st.session_state[session_key]),**kwargs )
-       
-        st.session_state[session_key] = selected_label
+        selected_label = st.selectbox(label, list(options.keys()), index=list(options.keys()).index(current_value), **kwargs)
+        if selected_label != current_value:
+            st.session_state[session_key] = selected_label
         
         return options[selected_label]
     
     elif input_type == "number_input":
-        value = st.number_input(label, value=st.session_state[session_key], **kwargs)
-        st.session_state[session_key] = value
+        value = st.number_input(label, value=current_value, **kwargs)
+        if value != current_value:
+            st.session_state[session_key] = value
         return value
     
     elif input_type == "checkbox":
-        value = st.checkbox(label, value=st.session_state[session_key], **kwargs)
-        st.session_state[session_key] = value
+        value = st.checkbox(label, value=current_value, **kwargs)
+        if value != current_value:
+            st.session_state[session_key] = value
         return value
     
     elif input_type == "date_input":
-        value = st.date_input(label, value=st.session_state[session_key], **kwargs)
-        st.session_state[session_key] = value
+        value = st.date_input(label, value=current_value, **kwargs)
+        if value != current_value:
+            st.session_state[session_key] = value
         return value
+    
     elif input_type == "text_input":
-        value = st.text_input(label, value=st.session_state[session_key], **kwargs)
-        st.session_state[session_key] = value
-        print (f"session_key {session_key}: [{value}]")
-
+        value = st.text_input(label, value=current_value, **kwargs)
+        if value != current_value:
+            st.session_state[session_key] = value
         return value
     
     else:
         raise ValueError(f"Unsupported input type: {input_type}")
-    
 
 
-tipo_busqueda_input     = custom_input("Tipo de busqueda",  "tipo_busqueda", SELECTBOX, options=tipo_busquete_filter)
-pais_input              = custom_input("Pais",              "pais",      TEXTBOX  ,help="Introduce el país de busqueda")
-ciudad_input            = custom_input("Ciudad",            "ciudad",    TEXTBOX, help="Introduce la ciudad de busqueda" )
+tipo_busqueda_input     = custom_input("Tipo de busqueda",  "tipo_busqueda", SELECTBOX, options=tipo_busqueda_filter)
+pais_input              = custom_input("Pais",              "pais",      TEXTBOX  ,help="Introduce el país de busqueda", default="España")
+ciudad_input            = custom_input("Ciudad",            "ciudad",    TEXTBOX, help="Introduce la ciudad de busqueda", default="Madrid")
 cp_input                = custom_input("Código postal",     "cp",        NUMBER_INPUT, help="Introduce el codigo postal", disabled= ciudad_input != '' )
 radiokm_input           = custom_input("Radio",             "radiokm",   NUMBER_INPUT, help="Introduce el radio  de busqueda en KM", disabled= ciudad_input != ''  )
-tipo_formato_input      = custom_input("Tipo de busqueda",  "tipo_formato", SELECTBOX, options=tipo_formato_filter)
-
-
-if st.button("¡¡Busca Wandall!!" ):
-    ejecutar_busqueda(cp_input,pais_input,ciudad_input,radiokm_input,0,tipo_busqueda_input,"", tipo_formato_input)
-        #st.write("**Comparaciones Actuales:**")
+tipo_formato_input      = custom_input("Tipo de formato",  "tipo_formato", SELECTBOX, options=tipo_formato_filter)
 
 
 
-#st.write("**Configuración actual:**")
-#st.write(f"Tipo de busqueda: {st.session_state['tipo_busqueda']}    - {tipo_busqueda_input}")
-#st.write(f"Pais              {st.session_state['pais']}             - {pais_input}")
-#st.write(f"Ciudad            {st.session_state['ciudad']}           - {ciudad_input}")
-#st.write(f"Código postal     {st.session_state['cp']}               - {cp_input}")
-#st.write(f"Radio             {st.session_state['radiokm']}          - {radiokm_input}")
-#st.write(f"Tipo de busqueda: {st.session_state['tipo_formato']}     - {tipo_formato_input}")
+if st.button(f"Buscar {tipo_busqueda_input}s"):
 
+    # 🧼 Limpiar variables de sesión después de mostrar y permitir descarga
+    st.session_state.pop("skateparks", None)
+    st.session_state.pop("markers", None)
+    st.session_state.pop("center", None)
+    st.session_state.pop("zoom", None)
+    skateparks_df, lat, lon = dame_skateparks(cp_input, pais_input, ciudad_input, radiokm_input, 0, tipo_busqueda_input)
+    
+    
+    # Inicializar el estado si no existe
+    if "markers" not in st.session_state:
+        st.session_state["markers"] = []
+    if "center" not in st.session_state:
+        st.session_state["center"] = [float(lat), float(lon)]
+    if "zoom" not in st.session_state:
+        st.session_state["zoom"] = 9
+
+    st.session_state["center"] = [float(lat), float(lon)]
+    st.session_state["zoom"] = 9
+    st.session_state["skateparks"] = skateparks_df
+
+if "skateparks" in st.session_state:
+    renderiza_dataframe()
+    m = folium.Map(location=st.session_state["center"], zoom_start=st.session_state["zoom"])
+    fg = folium.FeatureGroup(name="Markers")
+
+    # Crear el mapa centrado
+    m = folium.Map(location=st.session_state["center"], zoom_start=st.session_state["zoom"])
+
+    # Crear un grupo de características para los marcadores
+    fg = folium.FeatureGroup(name="Markers")
+
+    # Añadir los marcadores de prueba
+    #for park in skateparks:
+    for park in st.session_state["skateparks"].itertuples():
+        marker = folium.Marker(
+            location=[float(park.LATITUD), float(park.LONGITUD)],
+            popup=park.NOMBRE,
+            tooltip=park.NOMBRE,
+            icon=folium.Icon(color="blue", icon="skateboard", prefix="fa")
+        )
+        fg.add_child(marker)
+        st.session_state["markers"].append(marker)
+
+    # Añadir los marcadores almacenados en session_state
+    for marker in st.session_state["markers"]:
+        fg.add_child(marker)
+
+    # Renderizar el mapa
+    output = st_folium(
+        m,
+        center=st.session_state["center"],
+        zoom=st.session_state["zoom"],
+        key="new",
+        feature_group_to_add=fg,
+        height=600,
+        width='100%',
+    )
+
+    st.write("Número de marcadores:", len(st.session_state["markers"]))
+    #renderiza_mapa(skateparks_df, CENTRO_PENINSULA, 9)
+
+    ext = 'xlsx' if tipo_formato_input == 'excel' else 'csv'
+    archivo = f"{tipo_busqueda_input}_{cp_input if int(cp_input) !=0 else ciudad_input}_{pais_input}{f'_{radiokm_input}KM' if int(radiokm_input) !=0 and int(radiokm_input) != '' else ''}.{ext}"
+
+    if tipo_formato_input == 'excel':
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            st.session_state["skateparks"].to_excel(writer, index=False, sheet_name="Skateparks")
+            writer.close()
+        output.seek(0)
+        st.download_button(
+            label="📥 Descargar Excel",
+            data=output,
+            file_name=archivo,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    else:
+        csv = st.session_state["skateparks"].to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="📥 Descargar CSV",
+            data=csv,
+            file_name=archivo,
+            mime="text/csv"
+                    )
+else:
+    st.warning("Sin resultados: No se encontraron skateparks")
 
 

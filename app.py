@@ -24,14 +24,14 @@ CENTRO_PENINSULA= [40.3952443,	-3.703458799999999]
 
 
 
-#tipo_busqueda_filter = {
-#    "Skatepark": "skatepark",
-#    "Skateshop": "skateshop"
-#}
-
 tipo_busqueda_filter = {
-    "Skatepark": "skatepark"
+    "Skatepark": "skatepark",
+    "Skateshop": "skateshop"
 }
+
+#tipo_busquete_filter = {
+#    "Skatepark": "skatepark"
+#}
 
 tipo_formato_filter = {
     "CSV": "csv",
@@ -45,7 +45,7 @@ st.set_page_config(page_title="Skatepar/Skateshop finder", layout="wide")
 # Título del proyecto
 st.title("Wandanataleon Skatepark finder - MVP V1")
 
-# Configuración
+# Configuración Produccion
 google_places_api_key = st.secrets["GP_AK"]
 
 #@st.cache_data
@@ -81,11 +81,16 @@ def renderiza_mapa(df, centro=CENTRO_PENINSULA, zoom=9):
 
     # Añadir los marcadores de prueba
     for park in st.session_state["skateparks"].itertuples():
-        print  (f"lat[{park.LATITUD}] lon [{park.LONGITUD}]")
+        #print  (f"lat[{park.LATITUD}] lon [{park.LONGITUD}]")ç
+        popup_html = f"""
+            <strong>{park.NOMBRE}</strong><br>
+            Dirección: {park.DIRECCIÓN}<br>
+            <a href="{park.GOOGLE_MAPS_URL}" target="_blank">Ver en Google Maps</a>
+        """
 
         marker = folium.Marker(
             location=[float(park.LATITUD), float(park.LONGITUD)],
-            popup=park.NOMBRE,
+            popup=folium.Popup(popup_html, max_width=300),
             tooltip=park.NOMBRE,
             icon=folium.Icon(color="blue", icon="skateboard", prefix="fa")
         )
@@ -410,9 +415,14 @@ if "skateparks" in st.session_state:
     # Añadir los marcadores de prueba
     #for park in skateparks:
     for park in st.session_state["skateparks"].itertuples():
+        popup_html = f"""
+            <strong>{park.NOMBRE}</strong><br>
+            Dirección: {park.DIRECCIÓN}<br>
+            <a href="{park.GOOGLE_MAPS_URL}" target="_blank">Ver en Google Maps</a>
+        """
         marker = folium.Marker(
             location=[float(park.LATITUD), float(park.LONGITUD)],
-            popup=park.NOMBRE,
+            popup=folium.Popup(popup_html, max_width=300),
             tooltip=park.NOMBRE,
             icon=folium.Icon(color="blue", icon="skateboard", prefix="fa")
         )

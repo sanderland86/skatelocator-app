@@ -26,7 +26,8 @@ CENTRO_PENINSULA= [40.3952443,	-3.703458799999999]
 
 tipo_busqueda_filter = {
     "Skatepark": "skatepark",
-    "Skateshop": "skateshop"
+    "Skateshop": "skateshop",
+    "Snowpark": "snowpark"
 }
 
 #tipo_busquete_filter = {

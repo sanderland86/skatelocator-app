@@ -44,7 +44,7 @@ tipo_formato_filter = {
 
 st.set_page_config(page_title="Skatepar/Skateshop finder", layout="wide")
 # Título del proyecto
-st.title("Wandanataleon Skatepark finder - MVP V1")
+st.title("Wandall Skate spots finder")
 
 # Configuración Produccion
 google_places_api_key = st.secrets["GP_AK"]
